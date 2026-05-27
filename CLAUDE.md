@@ -54,9 +54,34 @@ pip install -r requirements.txt
 - 只注释关键配置项和启动逻辑，路由函数不加注释（函数名自解释）
 
 ### 代码组织
-- 所有代码放在 `app/` 包内，`app/__init__.py` 为空文件
-- 单模块结构：配置 → 数据库引擎 → ORM 模型 → Pydantic 模型 → 生命周期 → App 初始化 → 依赖注入 → 路由
-- 两个顶层定义之间空两行，类内部方法之间不空行（当前风格）
+
+```
+app/
+  config.py              # 环境变量配置
+  main.py                # create_app() 工厂 + lifespan
+  core/
+    database.py          # engine, AsyncSessionLocal, Base
+    security.py          # bcrypt + JWT 工具函数
+  models/
+    base.py              # Base 重导出
+    book.py              # Book ORM
+    user.py              # User ORM
+  schemas/
+    book.py              # BookOut
+    user.py              # UserRegister, UserLogin, UserOut
+    auth.py              # TokenOut
+  services/
+    book.py              # BookService
+    auth.py              # AuthService
+  api/
+    deps.py              # get_db, get_current_user, get_service
+    router.py            # 顶层 APIRouter
+    health.py            # /, /db/ping
+    books.py             # /books
+    auth.py              # /auth/*
+```
+
+依赖方向：`api/ → services/ → models/ → core/`（下层不依赖上层）
 
 ## 架构模式
 
@@ -93,7 +118,7 @@ pip install -r requirements.txt
 - 通过环境变量 `DB_CHECK_ON_STARTUP` 控制是否执行启动检查
 
 ### 路由
-- 直接使用 `@app.get()` 装饰器，不使用 `APIRouter`（学习阶段保持简单）
+- 使用 `APIRouter`，按模块拆分到 `api/` 目录下
 - 响应模型用 `response_model=list[BookOut]` 显式声明
 - ORM → Pydantic 转换使用 `BookOut.model_validate(book)`（Pydantic v2 风格）
 
@@ -107,7 +132,7 @@ pip install -r requirements.txt
 - [ ] 无测试
 - [ ] 无数据库迁移（使用 `create_all` 自动建表）
 - [ ] 无 CORS/中间件/异常处理
-- [ ] 无 APIRouter 拆分
+- [x] APIRouter 拆分（api/ 目录）
 - [x] 基本的 CRUD 读取
 - [x] 数据库连接 + ORM
 - [x] 依赖注入
