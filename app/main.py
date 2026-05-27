@@ -222,5 +222,21 @@ async def register(
     return UserOut.model_validate(user)
 
 
+@app.post("/auth/login", response_model=TokenOut)
+async def login(
+    body: UserLogin,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> TokenOut:
+    result = await db.execute(select(User).where(User.username == body.username))
+    user = result.scalar_one_or_none()
+    if user is None or not verify_password(body.password, user.password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="用户名或密码错误",
+        )
+    token = create_access_token(user.id)
+    return TokenOut(access_token=token, user=UserOut.model_validate(user))
+
+
 if __name__ == "__main__":
     uvicorn.run("app.main:app", host="127.0.0.1", port=8001, reload=True)
