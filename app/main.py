@@ -238,5 +238,12 @@ async def login(
     return TokenOut(access_token=token, user=UserOut.model_validate(user))
 
 
+@app.get("/auth/me", response_model=UserOut)
+async def get_me(
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> UserOut:
+    return UserOut.model_validate(current_user)
+
+
 if __name__ == "__main__":
     uvicorn.run("app.main:app", host="127.0.0.1", port=8001, reload=True)
