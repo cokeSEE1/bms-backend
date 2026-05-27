@@ -1,0 +1,27 @@
+target-version = "py313"
+line-length = 100
+
+[lint]
+select = [
+    "E",
+    "F",
+    "I",
+    "UP",
+    "B",
+    "ANN",
+    "RUF",
+    "TRY",
+    "FAST",
+    "COM",
+]
+
+ignore = [
+    "RUF003",
+    "B008",
+    "ANN204",
+    "TRY003",
+    "FAST001",
+]
+
+[lint.per-file-ignores]
+"app/main.py" = ["FAST002"]
