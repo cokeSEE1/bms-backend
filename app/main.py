@@ -1,24 +1,30 @@
 import os
-from typing import Annotated
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from sqlalchemy.exc import SQLAlchemyError
+from datetime import datetime
+from typing import Annotated
 
 import uvicorn
 from fastapi import Depends, FastAPI
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import String, text, select
+from sqlalchemy import DateTime, String, func, select, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 # 按需修改，或通过环境变量 DATABASE_URL 覆盖
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "mysql+aiomysql://root:zl123456@127.0.0.1:3306/test_db?charset=utf8mb4",
+    "mysql+aiomysql://root:zl123456@127.0.0.1:3307/test_db?charset=utf8mb4",
 )
 DB_CHECK_ON_STARTUP = os.getenv("DB_CHECK_ON_STARTUP", "1") == "1"
 
 engine = create_async_engine(DATABASE_URL, echo=True, pool_pre_ping=True)
-AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+AsyncSessionLocal = async_sessionmaker(
+    engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+)
 
 
 class Base(DeclarativeBase):
@@ -33,6 +39,17 @@ class Book(Base):
     author: Mapped[str] = mapped_column(String(100), nullable=False)
 
 
+class User(Base):
+    __tablename__ = "user"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    username: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+    password: Mapped[str] = mapped_column(String(60), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
+
+
 class BookOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -42,7 +59,7 @@ class BookOut(BaseModel):
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI):
+async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
     # 启动时做一次连通性校验并自动建表，可通过 DB_CHECK_ON_STARTUP=0 关闭
     if DB_CHECK_ON_STARTUP:
         try:
@@ -51,7 +68,7 @@ async def lifespan(_: FastAPI):
                 await conn.run_sync(Base.metadata.create_all)
         except SQLAlchemyError as exc:
             raise RuntimeError(
-                f"Database connection failed. DATABASE_URL={DATABASE_URL}"
+                f"Database connection failed. DATABASE_URL={DATABASE_URL}",
             ) from exc
     yield
     await engine.dispose()
@@ -60,13 +77,13 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="FastAPI Starter", version="0.1.0", lifespan=lifespan)
 
 
-async def get_db() -> AsyncSession:
+async def get_db() -> AsyncGenerator[AsyncSession]:
     async with AsyncSessionLocal() as session:
         yield session
 
 
 class BookService:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
     async def list_books(self, limit: int = 20) -> list[Book]:
@@ -84,14 +101,15 @@ def read_root() -> dict[str, str]:
     return {"message": "Hello, FastAPI"}
 
 
-
 @app.get("/db/ping")
-async def db_ping(db: AsyncSession = Depends(get_db)) -> dict[str, int]:
+async def db_ping(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict[str, int]:
     result = await db.execute(text("SELECT 1"))
     return {"db": result.scalar_one()}
 
 
-@app.get("/books", response_model=list[BookOut])
+@app.get("/books")
 async def list_books(
     service: Annotated[BookService, Depends(get_book_service)],
     limit: int = 20,
