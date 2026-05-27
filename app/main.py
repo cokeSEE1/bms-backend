@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Annotated
 
 import uvicorn
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Header, HTTPException, status
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import DateTime, String, func, select, text
 from sqlalchemy.exc import SQLAlchemyError
@@ -56,6 +56,29 @@ class BookOut(BaseModel):
     id: int
     title: str
     author: str
+
+
+class UserRegister(BaseModel):
+    username: str
+    password: str
+
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+
+class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    username: str
+    created_at: datetime
+
+
+class TokenOut(BaseModel):
+    access_token: str
+    user: UserOut
 
 
 @asynccontextmanager
