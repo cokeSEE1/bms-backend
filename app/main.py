@@ -204,5 +204,23 @@ async def list_books(
     return [BookOut.model_validate(book) for book in books]
 
 
+@app.post("/auth/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+async def register(
+    body: UserRegister,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> UserOut:
+    result = await db.execute(select(User).where(User.username == body.username))
+    if result.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="用户名已存在",
+        )
+    user = User(username=body.username, password=hash_password(body.password))
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return UserOut.model_validate(user)
+
+
 if __name__ == "__main__":
     uvicorn.run("app.main:app", host="127.0.0.1", port=8001, reload=True)
