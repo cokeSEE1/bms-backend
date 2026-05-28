@@ -3,9 +3,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import create_access_token, hash_password, verify_password
-from app.models.user import User
+from app.entities.user import User
 from app.schemas.auth import TokenOut
-from app.schemas.user import UserLogin, UserRegister, UserOut
+from app.schemas.user import UserLogin, UserOut, UserRegister
 
 
 class AuthService:
@@ -14,7 +14,7 @@ class AuthService:
 
     async def register(self, body: UserRegister) -> UserOut:
         result = await self.db.execute(
-            select(User).where(User.username == body.username)
+            select(User).where(User.username == body.username),
         )
         if result.scalar_one_or_none() is not None:
             raise HTTPException(
@@ -29,7 +29,7 @@ class AuthService:
 
     async def login(self, body: UserLogin) -> TokenOut:
         result = await self.db.execute(
-            select(User).where(User.username == body.username)
+            select(User).where(User.username == body.username),
         )
         user = result.scalar_one_or_none()
         if user is None or not verify_password(body.password, user.password):

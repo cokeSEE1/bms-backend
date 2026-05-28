@@ -1,17 +1,30 @@
-from datetime import datetime
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from sqlalchemy import DateTime, String, func
-from sqlalchemy.orm import Mapped, mapped_column
-
-from app.models.base import Base
+from app.entities.user import User
 
 
-class User(Base):
-    __tablename__ = "user"
+class UserModel:
+    _entity = User
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    username: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
-    password: Mapped[str] = mapped_column(String(60), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now(), nullable=False,
-    )
+    @staticmethod
+    async def get_by_id(db: AsyncSession, user_id: int) -> User | None:
+        result = await db.execute(
+            select(User).where(User.id == user_id, User.is_delete == 0)
+        )
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def get_by_username(db: AsyncSession, username: str) -> User | None:
+        result = await db.execute(
+            select(User).where(User.username == username, User.is_delete == 0)
+        )
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def create(db: AsyncSession, username: str, password: str) -> User:
+        user = User(username=username, password=password)
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        return user

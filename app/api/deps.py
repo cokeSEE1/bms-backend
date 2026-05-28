@@ -8,9 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import ALGORITHM, SECRET_KEY
 from app.core.database import AsyncSessionLocal
-from app.models.user import User
+from app.entities.user import User
 from app.services.auth import AuthService
-from app.services.book import BookService
 
 
 async def get_db() -> AsyncGenerator[AsyncSession]:
@@ -54,12 +53,6 @@ async def get_current_user(
             detail="用户不存在",
         )
     return user
-
-
-def get_book_service(
-    db: Annotated[AsyncSession, Depends(get_db)],
-) -> BookService:
-    return BookService(db)
 
 
 def get_auth_service(
