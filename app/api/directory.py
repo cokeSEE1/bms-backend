@@ -1,0 +1,19 @@
+from typing import Annotated
+
+from fastapi import APIRouter, Depends
+
+from app.api.deps import get_current_user, get_directory_service
+from app.entities.user import User
+from app.schemas.directory import DirectoryTreeOut, DirectoryTreeRequest
+from app.services.knowledge_directory import KnowledgeDirectoryService
+
+router = APIRouter(prefix="/api/v1/directory")
+
+
+@router.post("/tree", response_model=DirectoryTreeOut)
+async def get_directory_tree(
+    body: DirectoryTreeRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    service: Annotated[KnowledgeDirectoryService, Depends(get_directory_service)],
+) -> DirectoryTreeOut:
+    return await service.get_tree(body.dir_id, body.level)
