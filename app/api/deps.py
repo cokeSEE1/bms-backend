@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import ALGORITHM, SECRET_KEY
 from app.core.database import AsyncSessionLocal
+from app.core.redis import get_redis
 from app.entities.user import User
 from app.services.auth import AuthService
 
@@ -45,6 +46,17 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="凭据无效或已过期",
         ) from None
+
+    # 检查 Redis 黑名单
+    redis_client = get_redis()
+    if redis_client is not None:
+        jti: str | None = payload.get("jti")
+        if jti is not None and await redis_client.exists(f"bl:{jti}"):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="凭据已失效",
+            )
+
     result = await db.execute(select(User).where(User.id == int(user_id)))
     user = result.scalar_one_or_none()
     if user is None:
