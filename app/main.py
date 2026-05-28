@@ -9,6 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.api.router import api_router
 from app.config import DATABASE_URL, DB_CHECK_ON_STARTUP
 from app.core.database import Base, engine
+from app.models import base as _models_base  # noqa: F401 — 确保所有 entity 被导入后再 create_all
 
 
 @asynccontextmanager
@@ -27,7 +28,7 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="BMS", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="KMS", version="0.1.0", lifespan=lifespan)
     app.include_router(api_router)
     return app
 
