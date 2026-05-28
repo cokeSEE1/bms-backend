@@ -12,6 +12,7 @@ from app.core.database import AsyncSessionLocal
 from app.core.redis import get_redis
 from app.entities.user import User
 from app.services.auth import AuthService
+from app.services.knowledge_directory import KnowledgeDirectoryService
 
 
 async def get_db() -> AsyncGenerator[AsyncSession]:
@@ -76,3 +77,9 @@ def get_auth_service(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> AuthService:
     return AuthService(db)
+
+
+def get_directory_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> KnowledgeDirectoryService:
+    return KnowledgeDirectoryService(db)
