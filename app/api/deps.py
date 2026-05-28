@@ -3,6 +3,7 @@ from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException, status
 from jose import JWTError, jwt
+from redis.exceptions import RedisError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -51,11 +52,15 @@ async def get_current_user(
     redis_client = get_redis()
     if redis_client is not None:
         jti: str | None = payload.get("jti")
-        if jti is not None and await redis_client.exists(f"bl:{jti}"):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="凭据已失效",
-            )
+        if jti:
+            try:
+                if await redis_client.exists(f"bl:{jti}"):
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="凭据已失效",
+                    )
+            except RedisError:
+                pass  # Redis 不可达时降级放行
 
     result = await db.execute(select(User).where(User.id == int(user_id)))
     user = result.scalar_one_or_none()
