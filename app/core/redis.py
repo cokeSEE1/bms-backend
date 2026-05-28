@@ -7,8 +7,11 @@ _redis: aioredis.Redis | None = None
 
 async def init_redis() -> None:
     global _redis
-    _redis = aioredis.from_url(REDIS_URL, decode_responses=True)
-    await _redis.ping()
+    try:
+        _redis = aioredis.from_url(REDIS_URL, decode_responses=True)
+        await _redis.ping()
+    except aioredis.RedisError:
+        _redis = None  # Redis 不可用时降级，不影响启动
 
 
 async def close_redis() -> None:

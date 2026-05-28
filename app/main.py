@@ -24,10 +24,7 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
             raise RuntimeError(
                 f"Database connection failed. DATABASE_URL={DATABASE_URL}",
             ) from exc
-    try:
-        await init_redis()
-    except Exception:
-        pass  # Redis 不可用时降级，不影响启动
+    await init_redis()
     yield
     await engine.dispose()
     await close_redis()
