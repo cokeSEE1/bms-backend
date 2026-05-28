@@ -1,10 +1,14 @@
+from datetime import UTC, datetime
+
 from fastapi import HTTPException, status
+from redis.exceptions import RedisError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.redis import get_redis
 from app.core.security import create_access_token, hash_password, verify_password
 from app.entities.user import User
-from app.schemas.auth import TokenOut
+from app.schemas.auth import LogoutOut, TokenOut
 from app.schemas.user import UserLogin, UserOut, UserRegister
 
 
@@ -39,3 +43,14 @@ class AuthService:
             )
         token = create_access_token(user.id)
         return TokenOut(access_token=token, user=UserOut.model_validate(user))
+
+    async def logout(self, jti: str, exp: int) -> LogoutOut:
+        redis_client = get_redis()
+        if redis_client is not None:
+            remaining = exp - int(datetime.now(UTC).timestamp())
+            if remaining > 0:
+                try:
+                    await redis_client.set(f"bl:{jti}", "1", ex=remaining)
+                except RedisError:
+                    pass  # Redis 不可达时降级，不影响退出响应
+        return LogoutOut(message="已退出登录")
