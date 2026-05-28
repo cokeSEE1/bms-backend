@@ -9,6 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.api.router import api_router
 from app.config import DATABASE_URL, DB_CHECK_ON_STARTUP
 from app.core.database import Base, engine
+from app.core.redis import close_redis, init_redis
 from app.models import base as _models_base  # noqa: F401 — 确保所有 entity 被导入后再 create_all
 
 
@@ -23,8 +24,13 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
             raise RuntimeError(
                 f"Database connection failed. DATABASE_URL={DATABASE_URL}",
             ) from exc
+    try:
+        await init_redis()
+    except Exception:
+        pass  # Redis 不可用时降级，不影响启动
     yield
     await engine.dispose()
+    await close_redis()
 
 
 def create_app() -> FastAPI:
