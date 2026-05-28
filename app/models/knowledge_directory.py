@@ -61,6 +61,26 @@ class KnowledgeDirectoryModel:
         return list(result.scalars().all())
 
     @staticmethod
+    async def get_root_nodes(
+        db: AsyncSession, *, appid: int | None = None
+    ) -> list[KnowledgeDirectory]:
+        """获取所有根节点（parent_id IS NULL）"""
+        conditions = [
+            KnowledgeDirectory.is_delete == 0,
+            KnowledgeDirectory.parent_id.is_(None),
+        ]
+        if appid is not None:
+            conditions.append(KnowledgeDirectory.appid == appid)
+
+        stmt = (
+            select(KnowledgeDirectory)
+            .where(*conditions)
+            .order_by(KnowledgeDirectory.lft)
+        )
+        result = await db.execute(stmt)
+        return list(result.scalars().all())
+
+    @staticmethod
     async def create(db: AsyncSession, **kwargs) -> KnowledgeDirectory:
         directory = KnowledgeDirectory(**kwargs)
         db.add(directory)
