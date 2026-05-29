@@ -95,7 +95,7 @@ class KnowledgeItemService:
             directory = await KnowledgeDirectoryModel.get_by_id(self.db, cate_id)
             if directory is None:
                 raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
+                    status_code=404,
                     detail="目录不存在",
                 )
             subtree_nodes = await KnowledgeDirectoryModel.get_subtree_nodes(self.db, directory)
