@@ -53,3 +53,19 @@ class DirectoryDeleteResponse(BaseModel):
     deleted_count: int
     deleted_ids: list[int]
     dir_name: str
+
+
+class DirectorySearchItem(BaseModel):
+    id: int
+    dir_name: str
+    dir_type: int
+    level: int
+    parent_id: int | None
+    tree_id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DirectorySearchResponse(BaseModel):
+    total: int
+    items: list[DirectorySearchItem]

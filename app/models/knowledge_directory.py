@@ -414,6 +414,33 @@ class KnowledgeDirectoryModel:
         await db.commit()
 
     @staticmethod
+    async def search_by_name(
+        db: AsyncSession,
+        keyword: str,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> tuple[int, list[KnowledgeDirectory]]:
+        """按名称模糊搜索目录节点，返回 (总数, 分页结果)"""
+        base_conditions = [
+            KnowledgeDirectory.dir_name.like(f"%{keyword}%"),
+            KnowledgeDirectory.is_delete == 0,
+        ]
+
+        count_stmt = select(func.count()).where(*base_conditions)
+        count_result = await db.execute(count_stmt)
+        total = count_result.scalar() or 0
+
+        items_stmt = (
+            select(KnowledgeDirectory)
+            .where(*base_conditions)
+            .order_by(KnowledgeDirectory.lft)
+            .limit(limit)
+            .offset(offset)
+        )
+        items_result = await db.execute(items_stmt)
+        return total, list(items_result.scalars().all())
+
+    @staticmethod
     async def verify_noop_move(
         db: AsyncSession,
         position: str,

@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from app.api.deps import get_current_user, get_directory_service
 from app.entities.user import User
@@ -9,6 +9,7 @@ from app.schemas.directory import (
     DirectoryDeleteRequest,
     DirectoryDeleteResponse,
     DirectoryMoveRequest,
+    DirectorySearchResponse,
     DirectoryTreeOut,
     DirectoryTreeRequest,
     DirectoryUpdateRequest,
@@ -60,6 +61,17 @@ async def update_directory_node(
     service: Annotated[KnowledgeDirectoryService, Depends(get_directory_service)],
 ) -> DirectoryTreeOut:
     return await service.update_node(body)
+
+
+@router.get("/search", response_model=DirectorySearchResponse)
+async def search_directory(
+    keyword: Annotated[str, Query(min_length=1, max_length=256, description="搜索关键词")],
+    current_user: Annotated[User, Depends(get_current_user)],
+    service: Annotated[KnowledgeDirectoryService, Depends(get_directory_service)],
+    limit: Annotated[int, Query(ge=1, le=100, description="每页数量")] = 20,
+    offset: Annotated[int, Query(ge=0, description="偏移量")] = 0,
+) -> DirectorySearchResponse:
+    return await service.search_nodes(keyword, limit, offset)
 
 
 @router.put("/node/move", response_model=DirectoryTreeOut)

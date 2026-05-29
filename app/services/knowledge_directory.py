@@ -7,6 +7,8 @@ from app.schemas.directory import (
     DirectoryDeleteRequest,
     DirectoryDeleteResponse,
     DirectoryMoveRequest,
+    DirectorySearchItem,
+    DirectorySearchResponse,
     DirectoryTreeOut,
     DirectoryUpdateRequest,
 )
@@ -109,6 +111,17 @@ class KnowledgeDirectoryService:
                 detail="目录不存在",
             )
         return DirectoryTreeOut.model_validate(node)
+
+    async def search_nodes(
+        self, keyword: str, limit: int = 20, offset: int = 0
+    ) -> DirectorySearchResponse:
+        total, items = await KnowledgeDirectoryModel.search_by_name(
+            self.db, keyword, limit, offset
+        )
+        return DirectorySearchResponse(
+            total=total,
+            items=[DirectorySearchItem.model_validate(item) for item in items],
+        )
 
     async def move_node(self, req: DirectoryMoveRequest) -> DirectoryTreeOut:
         source = await KnowledgeDirectoryModel.get_by_id(self.db, req.source_id)
