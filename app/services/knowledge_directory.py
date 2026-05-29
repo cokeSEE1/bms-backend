@@ -2,7 +2,14 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.knowledge_directory import KnowledgeDirectoryModel
-from app.schemas.directory import DirectoryCreateRequest, DirectoryDeleteRequest, DirectoryDeleteResponse, DirectoryTreeOut, DirectoryUpdateRequest
+from app.schemas.directory import (
+    DirectoryCreateRequest,
+    DirectoryDeleteRequest,
+    DirectoryDeleteResponse,
+    DirectoryMoveRequest,
+    DirectoryTreeOut,
+    DirectoryUpdateRequest,
+)
 
 
 class KnowledgeDirectoryService:
@@ -102,3 +109,105 @@ class KnowledgeDirectoryService:
                 detail="目录不存在",
             )
         return DirectoryTreeOut.model_validate(node)
+
+    async def move_node(self, req: DirectoryMoveRequest) -> DirectoryTreeOut:
+        source = await KnowledgeDirectoryModel.get_by_id(self.db, req.source_id)
+        if source is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="要移动的目录不存在",
+            )
+
+        target = await KnowledgeDirectoryModel.get_by_id(self.db, req.target_id)
+        if target is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="目标目录不存在",
+            )
+
+        if source.parent_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="不能移动顶级目录",
+            )
+
+        if target.dir_type != 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="目标目录类型必须是目录",
+            )
+
+        if source.tree_id != target.tree_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="源目录和目标目录必须属于同一棵树",
+            )
+
+        position = req.position.value
+        if position in ("left", "right") and target.parent_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="目标目录不能是顶级目录",
+            )
+
+        # 检查不能移动到自己的子树中
+        is_ancestor = (
+            target.lft > source.lft
+            and target.rgt < source.rgt
+            and target.tree_id == source.tree_id
+        )
+        if is_ancestor and position in ("first-child", "last-child"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="无法将目录移动到自己的子节点中",
+            )
+
+        # 检查是否已经是目标位置
+        try:
+            await KnowledgeDirectoryModel.verify_noop_move(
+                self.db, position, source, target
+            )
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e),
+            ) from None
+
+        # 计算方向和目标位置
+        direction = KnowledgeDirectoryModel._relative_direction(position, source, target)
+        source_width = source.rgt - source.lft
+        new_left, new_right, new_level, new_parent_id = (
+            await KnowledgeDirectoryModel._calc_new_position(
+                self.db, direction, position, source_width, target
+            )
+        )
+
+        # 校验新父节点不是 source 的子孙（二次保障）
+        if new_parent_id is not None:
+            new_parent = await KnowledgeDirectoryModel.get_by_id(self.db, new_parent_id)
+            if new_parent is not None:
+                is_new_parent_descendant = (
+                    new_parent.lft > source.lft
+                    and new_parent.rgt < source.rgt
+                    and new_parent.tree_id == source.tree_id
+                )
+                if is_new_parent_descendant:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="无法将目录移动到自己的子节点中",
+                    )
+
+        # 执行 MPTT 移动
+        await KnowledgeDirectoryModel._relative_direction_strategy(
+            self.db,
+            direction=direction,
+            source=source,
+            new_left=new_left,
+            new_right=new_right,
+            new_level=new_level,
+            new_parent_id=new_parent_id,
+        )
+
+        # 返回更新后的节点
+        moved = await KnowledgeDirectoryModel.get_by_id(self.db, source.id)
+        return DirectoryTreeOut.model_validate(moved)
