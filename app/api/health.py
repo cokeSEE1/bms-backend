@@ -11,7 +11,7 @@ router = APIRouter()
 
 @router.get("/")
 def read_root() -> dict[str, str]:
-    return {"message": "Hello, BMS"}
+    return {"message": "Hello, KMS"}
 
 
 @router.get("/db/ping")
