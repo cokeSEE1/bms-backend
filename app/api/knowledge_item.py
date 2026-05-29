@@ -72,6 +72,7 @@ async def list_knowledge_items(
     end_time: Annotated[str | None, Query(description="更新时间结束")] = None,
     page: Annotated[int, Query(ge=1, description="页码")] = 1,
     page_size: Annotated[int, Query(ge=1, le=100, description="每页条数")] = 20,
+    recursive: Annotated[bool, Query(description="是否递归查询子目录")] = False,
 ) -> KnowledgeItemListResponse:
     offset = (page - 1) * page_size
     return await service.list_items(
@@ -83,6 +84,7 @@ async def list_knowledge_items(
         order_by=order_by,
         start_time=start_time,
         end_time=end_time,
+        recursive=recursive,
         limit=page_size,
         offset=offset,
     )
