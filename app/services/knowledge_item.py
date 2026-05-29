@@ -1,12 +1,15 @@
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.knowledge_base import KnowledgeBaseModel
 from app.models.knowledge_item import KnowledgeItemModel
 from app.schemas.knowledge_item import (
     KnowledgeItemCreate,
+    KnowledgeItemDetailOut,
     KnowledgeItemListResponse,
     KnowledgeItemOut,
     KnowledgeItemUpdate,
+    PathNode,
 )
 from app.services.es_sync import delete_from_es, sync_knowledge_item
 
@@ -25,7 +28,7 @@ class KnowledgeItemService:
         return KnowledgeItemOut.model_validate(item)
 
     async def create_item(
-        self, req: KnowledgeItemCreate, appid: int, creator: str
+        self, req: KnowledgeItemCreate, appid: int, creator: str,
     ) -> KnowledgeItemOut:
         item = await KnowledgeItemModel.create(
             self.db,
@@ -121,4 +124,44 @@ class KnowledgeItemService:
         return KnowledgeItemListResponse(
             total=total,
             items=[KnowledgeItemOut.model_validate(item) for item in items],
+        )
+
+    async def get_detail(self, knowledge_id: int) -> KnowledgeItemDetailOut:
+        item = await KnowledgeItemModel.get_by_id(self.db, knowledge_id)
+        if item is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="知识条目不存在",
+            )
+
+        # 提取 item 数据（必须在 commit 之前，避免 MissingGreenlet）
+        item_data = KnowledgeItemOut.model_validate(item).model_dump()
+
+        # 获取知识库名称
+        kb_name = ""
+        if item.kb_id:
+            kb = await KnowledgeBaseModel.get_by_id(self.db, item.kb_id)
+            if kb:
+                kb_name = kb.name
+
+        # 获取面包屑路径（MPTT 上溯）
+        knowledge_path: list[PathNode] = []
+        if item.cate_id:
+            from app.models.knowledge_directory import KnowledgeDirectoryModel
+
+            dir_node = await KnowledgeDirectoryModel.get_by_id(self.db, item.cate_id)
+            if dir_node:
+                ancestors = await KnowledgeDirectoryModel.get_ancestors(self.db, dir_node)
+                knowledge_path = [
+                    PathNode(dir_id=n.id, dir_name=n.dir_name, dir_type=n.dir_type)
+                    for n in ancestors
+                ]
+
+        # 递增浏览数
+        await KnowledgeItemModel.increment_view_count(self.db, knowledge_id)
+
+        return KnowledgeItemDetailOut(
+            **item_data,
+            kb_name=kb_name,
+            knowledge_path=knowledge_path,
         )

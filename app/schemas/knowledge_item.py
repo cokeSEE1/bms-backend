@@ -67,3 +67,23 @@ class KnowledgeItemOut(BaseModel):
 class KnowledgeItemListResponse(BaseModel):
     total: int
     items: list[KnowledgeItemOut]
+
+
+class PathNode(BaseModel):
+    dir_id: int
+    dir_name: str
+    dir_type: int
+
+
+class KnowledgeItemDetailOut(KnowledgeItemOut):
+    kb_name: str = ""
+    knowledge_path: list[PathNode] = []
+    creator_user_info: dict | None = None
+    last_modify_user_info: dict | None = None
+    tag_names: list[str] | None = None
+    attachments: list[dict] | None = None
+    is_favorite: bool | None = None
+    is_edit: bool | None = None
+    is_download: bool | None = None
+    comments_count: int | None = None
+    related_knowledge: list[dict] | None = None

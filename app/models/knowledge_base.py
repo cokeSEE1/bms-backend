@@ -13,7 +13,7 @@ class KnowledgeBaseModel:
             select(KnowledgeBase).where(
                 KnowledgeBase.id == kb_id,
                 KnowledgeBase.is_delete == 0,
-            )
+            ),
         )
         return result.scalar_one_or_none()
 

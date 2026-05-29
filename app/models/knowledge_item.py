@@ -14,13 +14,13 @@ class KnowledgeItemModel:
             select(KnowledgeItem).where(
                 KnowledgeItem.id == item_id,
                 KnowledgeItem.is_delete == 0,
-            )
+            ),
         )
         return result.scalar_one_or_none()
 
     @staticmethod
     async def get_list_by_kb_id(
-        db: AsyncSession, kb_id: int, *, limit: int = 20, offset: int = 0
+        db: AsyncSession, kb_id: int, *, limit: int = 20, offset: int = 0,
     ) -> tuple[int, list[KnowledgeItem]]:
         conditions = [KnowledgeItem.kb_id == kb_id, KnowledgeItem.is_delete == 0]
         count_stmt = (
@@ -47,7 +47,7 @@ class KnowledgeItemModel:
     async def create(db: AsyncSession, **kwargs) -> KnowledgeItem:
         if "name" in kwargs and not kwargs.get("name_sort_key"):
             kwargs["name_sort_key"] = "".join(
-                lazy_pinyin(str(kwargs["name"]))
+                lazy_pinyin(str(kwargs["name"])),
             )[:200]
         item = KnowledgeItem(**kwargs)
         db.add(item)
@@ -67,16 +67,16 @@ class KnowledgeItemModel:
 
     @staticmethod
     async def update_item(
-        db: AsyncSession, item_id: int, **kwargs
+        db: AsyncSession, item_id: int, **kwargs,
     ) -> KnowledgeItem | None:
         if "name" in kwargs and not kwargs.get("name_sort_key"):
             kwargs["name_sort_key"] = "".join(
-                lazy_pinyin(str(kwargs["name"]))
+                lazy_pinyin(str(kwargs["name"])),
             )[:200]
         await db.execute(
             update(KnowledgeItem)
             .where(KnowledgeItem.id == item_id, KnowledgeItem.is_delete == 0)
-            .values(**kwargs)
+            .values(**kwargs),
         )
         await db.commit()
         return await KnowledgeItemModel.get_by_id(db, item_id)
@@ -109,7 +109,7 @@ class KnowledgeItemModel:
             conditions.append(KnowledgeItem.author == author)
         if search is not None:
             conditions.append(
-                KnowledgeItem.name.like(f"%{search}%")
+                KnowledgeItem.name.like(f"%{search}%"),
             )
         if start_time is not None:
             conditions.append(KnowledgeItem.update_time >= start_time)
@@ -142,3 +142,12 @@ class KnowledgeItemModel:
         )
         items = (await db.execute(items_stmt)).scalars().all()
         return total, list(items)
+
+    @staticmethod
+    async def increment_view_count(db: AsyncSession, item_id: int) -> None:
+        await db.execute(
+            update(KnowledgeItem)
+            .where(KnowledgeItem.id == item_id, KnowledgeItem.is_delete == 0)
+            .values(view_count=KnowledgeItem.view_count + 1),
+        )
+        await db.commit()

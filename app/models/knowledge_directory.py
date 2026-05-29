@@ -13,13 +13,13 @@ class KnowledgeDirectoryModel:
             select(KnowledgeDirectory).where(
                 KnowledgeDirectory.id == dir_id,
                 KnowledgeDirectory.is_delete == 0,
-            )
+            ),
         )
         return result.scalar_one_or_none()
 
     @staticmethod
     async def get_children(
-        db: AsyncSession, parent_id: int | None, *, appid: int | None = None
+        db: AsyncSession, parent_id: int | None, *, appid: int | None = None,
     ) -> list[KnowledgeDirectory]:
         """获取指定节点的直接子节点"""
         conditions = [KnowledgeDirectory.is_delete == 0]
@@ -40,7 +40,7 @@ class KnowledgeDirectoryModel:
 
     @staticmethod
     async def get_tree(
-        db: AsyncSession, root_id: int
+        db: AsyncSession, root_id: int,
     ) -> list[KnowledgeDirectory]:
         """获取某个节点及其所有子孙节点（通过 lft/rgt 范围查询）"""
         root = await KnowledgeDirectoryModel.get_by_id(db, root_id)
@@ -50,7 +50,7 @@ class KnowledgeDirectoryModel:
 
     @staticmethod
     async def get_subtree_nodes(
-        db: AsyncSession, node: KnowledgeDirectory
+        db: AsyncSession, node: KnowledgeDirectory,
     ) -> list[KnowledgeDirectory]:
         """获取某个节点及其所有子孙节点（通过 MPTT lft/rgt 范围查询）"""
         stmt = (
@@ -68,7 +68,7 @@ class KnowledgeDirectoryModel:
 
     @staticmethod
     async def soft_delete_nodes(
-        db: AsyncSession, node_ids: list[int], delete_type: int
+        db: AsyncSession, node_ids: list[int], delete_type: int,
     ) -> None:
         """批量软删除目录节点"""
         if not node_ids:
@@ -79,13 +79,13 @@ class KnowledgeDirectoryModel:
                 KnowledgeDirectory.id.in_(node_ids),
                 KnowledgeDirectory.is_delete == 0,
             )
-            .values(is_delete=delete_type)
+            .values(is_delete=delete_type),
         )
         await db.commit()
 
     @staticmethod
     async def update_node(
-        db: AsyncSession, dir_id: int, dir_name: str
+        db: AsyncSession, dir_id: int, dir_name: str,
     ) -> KnowledgeDirectory | None:
         """更新目录节点名称"""
         await db.execute(
@@ -94,14 +94,14 @@ class KnowledgeDirectoryModel:
                 KnowledgeDirectory.id == dir_id,
                 KnowledgeDirectory.is_delete == 0,
             )
-            .values(dir_name=dir_name)
+            .values(dir_name=dir_name),
         )
         await db.commit()
         return await KnowledgeDirectoryModel.get_by_id(db, dir_id)
 
     @staticmethod
     async def get_root_nodes(
-        db: AsyncSession, *, appid: int | None = None
+        db: AsyncSession, *, appid: int | None = None,
     ) -> list[KnowledgeDirectory]:
         """获取所有根节点（parent_id IS NULL）"""
         conditions = [
@@ -148,7 +148,7 @@ class KnowledgeDirectoryModel:
                 KnowledgeDirectory.tree_id == tree_id,
                 KnowledgeDirectory.rgt >= new_lft,
             )
-            .values(rgt=KnowledgeDirectory.rgt + 2)
+            .values(rgt=KnowledgeDirectory.rgt + 2),
         )
         # 腾位置：lft > new_lft 的节点 lft += 2
         await db.execute(
@@ -157,7 +157,7 @@ class KnowledgeDirectoryModel:
                 KnowledgeDirectory.tree_id == tree_id,
                 KnowledgeDirectory.lft > new_lft,
             )
-            .values(lft=KnowledgeDirectory.lft + 2)
+            .values(lft=KnowledgeDirectory.lft + 2),
         )
 
         directory = KnowledgeDirectory(
@@ -180,7 +180,7 @@ class KnowledgeDirectoryModel:
 
     @staticmethod
     async def _get_first_child(
-        db: AsyncSession, parent_id: int
+        db: AsyncSession, parent_id: int,
     ) -> KnowledgeDirectory | None:
         """获取父节点下第一个子节点（按 lft 排序）"""
         stmt = (
@@ -197,7 +197,7 @@ class KnowledgeDirectoryModel:
 
     @staticmethod
     async def _get_last_child(
-        db: AsyncSession, parent_id: int
+        db: AsyncSession, parent_id: int,
     ) -> KnowledgeDirectory | None:
         """获取父节点下最后一个子节点（按 lft 排序）"""
         stmt = (
@@ -214,7 +214,7 @@ class KnowledgeDirectoryModel:
 
     @staticmethod
     async def _get_left_sibling(
-        db: AsyncSession, node: KnowledgeDirectory
+        db: AsyncSession, node: KnowledgeDirectory,
     ) -> KnowledgeDirectory | None:
         """获取节点的左兄弟"""
         stmt = (
@@ -234,7 +234,7 @@ class KnowledgeDirectoryModel:
 
     @staticmethod
     async def _get_children_count(
-        db: AsyncSession, parent_id: int
+        db: AsyncSession, parent_id: int,
     ) -> int:
         """获取父节点的直接子节点数量"""
         stmt = select(func.count()).where(
@@ -346,7 +346,7 @@ class KnowledgeDirectoryModel:
             .values(
                 lft=KnowledgeDirectory.lft - source_right,
                 rgt=KnowledgeDirectory.rgt - source_right,
-            )
+            ),
         )
 
         # 阶段2：移动受影响的中间节点
@@ -357,7 +357,7 @@ class KnowledgeDirectoryModel:
                     KnowledgeDirectory.tree_id == tree_id,
                     KnowledgeDirectory.lft.between(source_left, new_right),
                 )
-                .values(lft=KnowledgeDirectory.lft - source_width - PADDING)
+                .values(lft=KnowledgeDirectory.lft - source_width - PADDING),
             )
             await db.execute(
                 update(KnowledgeDirectory)
@@ -365,7 +365,7 @@ class KnowledgeDirectoryModel:
                     KnowledgeDirectory.tree_id == tree_id,
                     KnowledgeDirectory.rgt.between(source_left, new_right),
                 )
-                .values(rgt=KnowledgeDirectory.rgt - source_width - PADDING)
+                .values(rgt=KnowledgeDirectory.rgt - source_width - PADDING),
             )
         else:  # 向左移动，中间节点右移
             await db.execute(
@@ -374,7 +374,7 @@ class KnowledgeDirectoryModel:
                     KnowledgeDirectory.tree_id == tree_id,
                     KnowledgeDirectory.lft.between(new_left, source_right),
                 )
-                .values(lft=KnowledgeDirectory.lft + source_width + PADDING)
+                .values(lft=KnowledgeDirectory.lft + source_width + PADDING),
             )
             await db.execute(
                 update(KnowledgeDirectory)
@@ -382,7 +382,7 @@ class KnowledgeDirectoryModel:
                     KnowledgeDirectory.tree_id == tree_id,
                     KnowledgeDirectory.rgt.between(new_left, source_right),
                 )
-                .values(rgt=KnowledgeDirectory.rgt + source_width + PADDING)
+                .values(rgt=KnowledgeDirectory.rgt + source_width + PADDING),
             )
 
         # 阶段3：恢复源节点到新位置
@@ -401,14 +401,14 @@ class KnowledgeDirectoryModel:
                 lft=KnowledgeDirectory.lft + source_right + diff_value,
                 rgt=KnowledgeDirectory.rgt + source_right + diff_value,
                 level=KnowledgeDirectory.level + diff_level,
-            )
+            ),
         )
 
         # 更新源节点的 parent_id
         await db.execute(
             update(KnowledgeDirectory)
             .where(KnowledgeDirectory.id == source.id)
-            .values(parent_id=new_parent_id)
+            .values(parent_id=new_parent_id),
         )
 
         await db.commit()
@@ -468,3 +468,21 @@ class KnowledgeDirectoryModel:
                     last_child = await KnowledgeDirectoryModel._get_last_child(db, target.id)
                     if last_child and last_child.id == source.id:
                         raise ValueError("目录已在目标位置")
+
+    @staticmethod
+    async def get_ancestors(
+        db: AsyncSession, node: KnowledgeDirectory,
+    ) -> list[KnowledgeDirectory]:
+        """获取节点的所有祖先（从根到当前节点，按 lft 排序）"""
+        stmt = (
+            select(KnowledgeDirectory)
+            .where(
+                KnowledgeDirectory.tree_id == node.tree_id,
+                KnowledgeDirectory.lft <= node.lft,
+                KnowledgeDirectory.rgt >= node.rgt,
+                KnowledgeDirectory.is_delete == 0,
+            )
+            .order_by(KnowledgeDirectory.lft)
+        )
+        result = await db.execute(stmt)
+        return list(result.scalars().all())

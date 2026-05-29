@@ -6,6 +6,7 @@ from app.api.deps import get_current_user, get_knowledge_item_service
 from app.entities.user import User
 from app.schemas.knowledge_item import (
     KnowledgeItemCreate,
+    KnowledgeItemDetailOut,
     KnowledgeItemListResponse,
     KnowledgeItemOut,
     KnowledgeItemUpdate,
@@ -13,6 +14,15 @@ from app.schemas.knowledge_item import (
 from app.services.knowledge_item import KnowledgeItemService
 
 router = APIRouter(prefix="/v1/knowledge")
+
+
+@router.get("/detail", response_model=KnowledgeItemDetailOut)
+async def get_knowledge_detail(
+    knowledge_id: Annotated[int, Query(description="知识条目ID")],
+    current_user: Annotated[User, Depends(get_current_user)],
+    service: Annotated[KnowledgeItemService, Depends(get_knowledge_item_service)],
+) -> KnowledgeItemDetailOut:
+    return await service.get_detail(knowledge_id)
 
 
 @router.post("/item", response_model=KnowledgeItemOut, status_code=201)
