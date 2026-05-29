@@ -46,19 +46,7 @@ class KnowledgeDirectoryModel:
         root = await KnowledgeDirectoryModel.get_by_id(db, root_id)
         if root is None:
             return []
-
-        stmt = (
-            select(KnowledgeDirectory)
-            .where(
-                KnowledgeDirectory.tree_id == root.tree_id,
-                KnowledgeDirectory.lft >= root.lft,
-                KnowledgeDirectory.rgt <= root.rgt,
-                KnowledgeDirectory.is_delete == 0,
-            )
-            .order_by(KnowledgeDirectory.lft)
-        )
-        result = await db.execute(stmt)
-        return list(result.scalars().all())
+        return await KnowledgeDirectoryModel.get_subtree_nodes(db, root)
 
     @staticmethod
     async def get_subtree_nodes(
