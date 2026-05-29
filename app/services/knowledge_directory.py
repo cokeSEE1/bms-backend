@@ -2,7 +2,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.knowledge_directory import KnowledgeDirectoryModel
-from app.schemas.directory import DirectoryCreateRequest, DirectoryDeleteRequest, DirectoryDeleteResponse, DirectoryTreeOut
+from app.schemas.directory import DirectoryCreateRequest, DirectoryDeleteRequest, DirectoryDeleteResponse, DirectoryTreeOut, DirectoryUpdateRequest
 
 
 class KnowledgeDirectoryService:
@@ -91,3 +91,14 @@ class KnowledgeDirectoryService:
             deleted_ids=ids,
             dir_name=node.dir_name,
         )
+
+    async def update_node(self, req: DirectoryUpdateRequest) -> DirectoryTreeOut:
+        node = await KnowledgeDirectoryModel.update_node(
+            self.db, req.dir_id, req.dir_name
+        )
+        if node is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="目录不存在",
+            )
+        return DirectoryTreeOut.model_validate(node)

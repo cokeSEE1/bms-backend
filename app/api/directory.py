@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 
 from app.api.deps import get_current_user, get_directory_service
 from app.entities.user import User
-from app.schemas.directory import DirectoryCreateRequest, DirectoryDeleteRequest, DirectoryDeleteResponse, DirectoryTreeOut, DirectoryTreeRequest
+from app.schemas.directory import DirectoryCreateRequest, DirectoryDeleteRequest, DirectoryDeleteResponse, DirectoryTreeOut, DirectoryTreeRequest, DirectoryUpdateRequest
 from app.services.knowledge_directory import KnowledgeDirectoryService
 
 router = APIRouter(prefix="/v1/directory")
@@ -43,3 +43,12 @@ async def delete_directory_node(
     service: Annotated[KnowledgeDirectoryService, Depends(get_directory_service)],
 ) -> DirectoryDeleteResponse:
     return await service.delete_node(body)
+
+
+@router.put("/node", response_model=DirectoryTreeOut)
+async def update_directory_node(
+    body: DirectoryUpdateRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    service: Annotated[KnowledgeDirectoryService, Depends(get_directory_service)],
+) -> DirectoryTreeOut:
+    return await service.update_node(body)

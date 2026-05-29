@@ -18,6 +18,11 @@ class DirectoryDeleteRequest(BaseModel):
     delete_type: int = Field(..., ge=1, le=2, description="1=软删除(可恢复), 2=彻底删除(不可恢复)")
 
 
+class DirectoryUpdateRequest(BaseModel):
+    dir_id: int = Field(..., description="要更新的目录节点id")
+    dir_name: str = Field(..., min_length=1, max_length=256, description="新目录名称")
+
+
 class DirectoryTreeOut(BaseModel):
     id: int
     dir_name: str

@@ -84,6 +84,22 @@ class KnowledgeDirectoryModel:
         await db.commit()
 
     @staticmethod
+    async def update_node(
+        db: AsyncSession, dir_id: int, dir_name: str
+    ) -> KnowledgeDirectory | None:
+        """更新目录节点名称"""
+        await db.execute(
+            update(KnowledgeDirectory)
+            .where(
+                KnowledgeDirectory.id == dir_id,
+                KnowledgeDirectory.is_delete == 0,
+            )
+            .values(dir_name=dir_name)
+        )
+        await db.commit()
+        return await KnowledgeDirectoryModel.get_by_id(db, dir_id)
+
+    @staticmethod
     async def get_root_nodes(
         db: AsyncSession, *, appid: int | None = None
     ) -> list[KnowledgeDirectory]:
