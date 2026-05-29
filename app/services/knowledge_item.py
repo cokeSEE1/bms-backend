@@ -86,11 +86,27 @@ class KnowledgeItemService:
         end_time: str | None = None,
         limit: int = 20,
         offset: int = 0,
+        recursive: bool = False,
     ) -> KnowledgeItemListResponse:
+        resolved_cate_ids: list[int] | None = cate_ids
+        if recursive and cate_id is not None:
+            from app.models.knowledge_directory import KnowledgeDirectoryModel
+
+            directory = await KnowledgeDirectoryModel.get_by_id(self.db, cate_id)
+            if directory is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="目录不存在",
+                )
+            subtree_nodes = await KnowledgeDirectoryModel.get_subtree_nodes(self.db, directory)
+            resolved_cate_ids = [node.id for node in subtree_nodes]
+            if not resolved_cate_ids:
+                return KnowledgeItemListResponse(total=0, items=[])
+
         total, items = await KnowledgeItemModel.get_list_with_filters(
             self.db,
-            cate_id=cate_id,
-            cate_ids=cate_ids,
+            cate_id=cate_id if not recursive else None,
+            cate_ids=resolved_cate_ids,
             search=search,
             status=status,
             author=author,
