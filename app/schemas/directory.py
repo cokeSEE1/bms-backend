@@ -15,7 +15,7 @@ class DirectoryCreateRequest(BaseModel):
 
 class DirectoryDeleteRequest(BaseModel):
     dir_id: int = Field(..., description="要删除的目录节点id")
-    delete_type: int = Field(..., ge=1, le=2, description="1=软删除, 2=硬删除")
+    delete_type: int = Field(..., ge=1, le=2, description="1=软删除(可恢复), 2=彻底删除(不可恢复)")
 
 
 class DirectoryTreeOut(BaseModel):
