@@ -1,4 +1,13 @@
+from enum import Enum
+
 from pydantic import BaseModel, ConfigDict, Field
+
+
+class MovePosition(str, Enum):
+    left = "left"
+    right = "right"
+    first_child = "first-child"
+    last_child = "last-child"
 
 
 class DirectoryTreeRequest(BaseModel):
@@ -21,6 +30,12 @@ class DirectoryDeleteRequest(BaseModel):
 class DirectoryUpdateRequest(BaseModel):
     dir_id: int = Field(..., description="要更新的目录节点id")
     dir_name: str = Field(..., min_length=1, max_length=256, description="新目录名称")
+
+
+class DirectoryMoveRequest(BaseModel):
+    source_id: int = Field(..., description="要移动的目录节点id")
+    target_id: int = Field(..., description="目标目录节点id")
+    position: MovePosition = Field(..., description="移动位置: left/right/first-child/last-child")
 
 
 class DirectoryTreeOut(BaseModel):
