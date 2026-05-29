@@ -61,6 +61,41 @@ class KnowledgeDirectoryModel:
         return list(result.scalars().all())
 
     @staticmethod
+    async def get_subtree_nodes(
+        db: AsyncSession, node: KnowledgeDirectory
+    ) -> list[KnowledgeDirectory]:
+        """获取某个节点及其所有子孙节点（通过 MPTT lft/rgt 范围查询）"""
+        stmt = (
+            select(KnowledgeDirectory)
+            .where(
+                KnowledgeDirectory.tree_id == node.tree_id,
+                KnowledgeDirectory.lft >= node.lft,
+                KnowledgeDirectory.rgt <= node.rgt,
+                KnowledgeDirectory.is_delete == 0,
+            )
+            .order_by(KnowledgeDirectory.lft)
+        )
+        result = await db.execute(stmt)
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def soft_delete_nodes(
+        db: AsyncSession, node_ids: list[int], delete_type: int
+    ) -> None:
+        """批量软删除目录节点"""
+        if not node_ids:
+            return
+        await db.execute(
+            update(KnowledgeDirectory)
+            .where(
+                KnowledgeDirectory.id.in_(node_ids),
+                KnowledgeDirectory.is_delete == 0,
+            )
+            .values(is_delete=delete_type)
+        )
+        await db.commit()
+
+    @staticmethod
     async def get_root_nodes(
         db: AsyncSession, *, appid: int | None = None
     ) -> list[KnowledgeDirectory]:
