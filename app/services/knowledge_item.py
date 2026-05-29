@@ -37,6 +37,7 @@ class KnowledgeItemService:
             content=req.content,
             abstract=req.abstract,
             author=req.author,
+            status=req.status,
             knowledge_type=req.knowledge_type,
             dir_type=req.dir_type,
             tag_ids=req.tag_ids,
