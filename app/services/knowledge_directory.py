@@ -125,6 +125,12 @@ class KnowledgeDirectoryService:
                 detail="目标目录不存在",
             )
 
+        if source.id == target.id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="源目录和目标目录不能相同",
+            )
+
         if source.parent_id is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
