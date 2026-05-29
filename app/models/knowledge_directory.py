@@ -1,4 +1,4 @@
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.entities.knowledge_directory import KnowledgeDirectory
@@ -83,6 +83,55 @@ class KnowledgeDirectoryModel:
     @staticmethod
     async def create(db: AsyncSession, **kwargs) -> KnowledgeDirectory:
         directory = KnowledgeDirectory(**kwargs)
+        db.add(directory)
+        await db.commit()
+        await db.refresh(directory)
+        return directory
+
+    @staticmethod
+    async def create_node(
+        db: AsyncSession,
+        parent: KnowledgeDirectory,
+        dir_name: str,
+        dir_type: int,
+        km_id: int | None = None,
+    ) -> KnowledgeDirectory:
+        """在父节点末尾插入新子节点，自动 MPTT 重平衡"""
+        tree_id = parent.tree_id
+        new_lft = parent.rgt
+        new_rgt = parent.rgt + 1
+        new_level = parent.level + 1
+
+        # 腾位置：rgt >= new_lft 的节点 rgt += 2
+        await db.execute(
+            update(KnowledgeDirectory)
+            .where(
+                KnowledgeDirectory.tree_id == tree_id,
+                KnowledgeDirectory.rgt >= new_lft,
+            )
+            .values(rgt=KnowledgeDirectory.rgt + 2)
+        )
+        # 腾位置：lft > new_lft 的节点 lft += 2
+        await db.execute(
+            update(KnowledgeDirectory)
+            .where(
+                KnowledgeDirectory.tree_id == tree_id,
+                KnowledgeDirectory.lft > new_lft,
+            )
+            .values(lft=KnowledgeDirectory.lft + 2)
+        )
+
+        directory = KnowledgeDirectory(
+            appid=parent.appid,
+            dir_name=dir_name,
+            dir_type=dir_type,
+            km_id=km_id,
+            tree_id=tree_id,
+            lft=new_lft,
+            rgt=new_rgt,
+            level=new_level,
+            parent_id=parent.id,
+        )
         db.add(directory)
         await db.commit()
         await db.refresh(directory)
