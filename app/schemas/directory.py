@@ -13,6 +13,11 @@ class DirectoryCreateRequest(BaseModel):
     km_id: int | None = Field(None, description="关联知识id")
 
 
+class DirectoryDeleteRequest(BaseModel):
+    dir_id: int = Field(..., description="要删除的目录节点id")
+    delete_type: int = Field(..., ge=1, le=2, description="1=软删除, 2=硬删除")
+
+
 class DirectoryTreeOut(BaseModel):
     id: int
     dir_name: str
@@ -22,3 +27,9 @@ class DirectoryTreeOut(BaseModel):
     children: list["DirectoryTreeOut"] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class DirectoryDeleteResponse(BaseModel):
+    deleted_count: int
+    deleted_ids: list[int]
+    dir_name: str
