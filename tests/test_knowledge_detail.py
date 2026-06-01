@@ -84,7 +84,7 @@ class TestKnowledgeDetailAPI:
                 make_mock_directory(),
             ]
 
-        async def mock_get_detail(knowledge_id: int):
+        async def mock_get_detail(knowledge_id: int, current_user=None):
             from app.schemas.knowledge_item import KnowledgeItemDetailOut, KnowledgeItemOut, PathNode
 
             if mock_item is None:
@@ -100,7 +100,14 @@ class TestKnowledgeDetailAPI:
                 for d in mock_dirs
             ]
             return KnowledgeItemDetailOut(
-                **item_data, kb_name=kb_name, knowledge_path=knowledge_path,
+                **item_data,
+                kb_name=kb_name,
+                knowledge_path=knowledge_path,
+                creator_user_info={"username": "admin"},
+                last_modify_user_info={"username": "admin"},
+                tag_names=["1", "2", "3"],
+                is_edit=False,
+                is_download=True,
             )
 
         mock_service = MagicMock()
@@ -154,19 +161,25 @@ class TestKnowledgeDetailAPI:
         ]:
             assert field in data, f"缺少基础字段: {field}"
 
-    def test_reserved_fields_are_null(self, client, auth_headers):
+    def test_reserved_fields_are_filled(self, client, auth_headers):
         mock_item = make_mock_item()
         self._setup_dependencies(client, mock_item)
 
         response = client.get("/v1/knowledge/detail?knowledge_id=1", headers=auth_headers)
         data = response.json()
 
-        for field in [
-            "creator_user_info", "last_modify_user_info", "tag_names",
-            "attachments", "is_favorite", "is_edit", "is_download",
-            "comments_count", "related_knowledge",
-        ]:
-            assert data[field] is None, f"预留字段 {field} 应为 null, 实际: {data[field]}"
+        assert isinstance(data["creator_user_info"], dict)
+        assert "username" in data["creator_user_info"]
+
+        assert isinstance(data["last_modify_user_info"], dict)
+        assert "username" in data["last_modify_user_info"]
+
+        assert isinstance(data["tag_names"], list)
+        for tag in data["tag_names"]:
+            assert isinstance(tag, str)
+
+        assert isinstance(data["is_edit"], bool)
+        assert data["is_download"] is True
 
     def test_knowledge_path_node_structure(self, client, auth_headers):
         mock_item = make_mock_item()
@@ -333,7 +346,7 @@ class TestKnowledgeDetailAPI:
 class TestKnowledgeDetailService:
 
     @staticmethod
-    def _patch_models(item, kb=None, dir_node=None, ancestors=None):
+    def _patch_models(item, kb=None, dir_node=None, ancestors=None, user_mock=None):
         """在 service 文件的引用位置 patch Model"""
 
         patches = [
@@ -350,6 +363,9 @@ class TestKnowledgeDetailService:
                 _make_dir_model_mock(dir_node, ancestors),
             ),
         ]
+        if user_mock is None:
+            user_mock = _make_user_model_mock()
+        patches.append(patch("app.services.knowledge_item.UserModel", user_mock))
         return patches
 
     # ---------- 正向 ----------
@@ -363,21 +379,26 @@ class TestKnowledgeDetailService:
             make_mock_directory(id=1, dir_name="根目录", dir_type=0, lft=1, rgt=20),
             dir_node,
         ]
+        from app.entities.user import User
+        mock_user = User(id=1, username="testuser")
 
-        ps = self._patch_models(item, kb, dir_node, ancestors)
+        ps = self._patch_models(item, kb, dir_node, ancestors, _make_user_model_mock("admin"))
         for p in ps:
             p.start()
         try:
             from app.services.knowledge_item import KnowledgeItemService
 
             service = KnowledgeItemService(MagicMock())
-            result = await service.get_detail(1)
+            result = await service.get_detail(1, mock_user)
 
             assert result.id == 1
             assert result.kb_name == "测试知识库"
             assert len(result.knowledge_path) == 2
             assert result.knowledge_path[0].dir_name == "根目录"
-            assert result.creator_user_info is None
+            assert result.creator_user_info == {"username": "admin"}
+            assert result.is_edit is False
+            assert result.is_download is True
+            assert result.tag_names == ["1", "2", "3"]
         finally:
             for p in ps:
                 p.stop()
@@ -386,6 +407,8 @@ class TestKnowledgeDetailService:
     async def test_calls_increment_view_count(self):
         item = make_mock_item(view_count=5)
         kb = make_mock_kb()
+        from app.entities.user import User
+        mock_user = User(id=1, username="testuser")
 
         ps = self._patch_models(item, kb)
         for p in ps:
@@ -395,7 +418,7 @@ class TestKnowledgeDetailService:
             from app.services.knowledge_item import KnowledgeItemService
 
             service = KnowledgeItemService(MagicMock())
-            await service.get_detail(1)
+            await service.get_detail(1, mock_user)
 
             svc_mod.KnowledgeItemModel.increment_view_count.assert_awaited_once()
         finally:
@@ -406,6 +429,9 @@ class TestKnowledgeDetailService:
 
     @pytest.mark.asyncio
     async def test_item_not_found_raises_404(self):
+        from app.entities.user import User
+        mock_user = User(id=1, username="testuser")
+
         ps = self._patch_models(None)
         for p in ps:
             p.start()
@@ -415,7 +441,7 @@ class TestKnowledgeDetailService:
 
             service = KnowledgeItemService(MagicMock())
             with pytest.raises(HTTPException) as exc:
-                await service.get_detail(99999)
+                await service.get_detail(99999, mock_user)
 
             assert exc.value.status_code == 404
             assert "知识条目不存在" in exc.value.detail
@@ -430,6 +456,8 @@ class TestKnowledgeDetailService:
         item = make_mock_item(cate_id=1)
         kb = make_mock_kb()
         dir_node = make_mock_directory(id=1, dir_name="根目录", dir_type=0)
+        from app.entities.user import User
+        mock_user = User(id=1, username="testuser")
 
         ps = self._patch_models(item, kb, dir_node, [dir_node])
         for p in ps:
@@ -438,7 +466,7 @@ class TestKnowledgeDetailService:
             from app.services.knowledge_item import KnowledgeItemService
 
             service = KnowledgeItemService(MagicMock())
-            result = await service.get_detail(1)
+            result = await service.get_detail(1, mock_user)
 
             assert len(result.knowledge_path) == 1
             assert result.knowledge_path[0].dir_name == "根目录"
@@ -456,6 +484,8 @@ class TestKnowledgeDetailService:
             make_mock_directory(id=3, dir_name="第二层", lft=5, rgt=25, level=1),
             dir_node,
         ]
+        from app.entities.user import User
+        mock_user = User(id=1, username="testuser")
 
         ps = self._patch_models(item, kb, dir_node, ancestors)
         for p in ps:
@@ -464,7 +494,7 @@ class TestKnowledgeDetailService:
             from app.services.knowledge_item import KnowledgeItemService
 
             service = KnowledgeItemService(MagicMock())
-            result = await service.get_detail(1)
+            result = await service.get_detail(1, mock_user)
 
             assert [n.dir_name for n in result.knowledge_path] == ["根目录", "第二层", "第三层"]
         finally:
@@ -475,6 +505,8 @@ class TestKnowledgeDetailService:
     async def test_no_cate_id_empty_path(self):
         item = make_mock_item(cate_id=None)
         kb = make_mock_kb()
+        from app.entities.user import User
+        mock_user = User(id=1, username="testuser")
 
         ps = self._patch_models(item, kb)
         for p in ps:
@@ -483,7 +515,7 @@ class TestKnowledgeDetailService:
             from app.services.knowledge_item import KnowledgeItemService
 
             service = KnowledgeItemService(MagicMock())
-            result = await service.get_detail(1)
+            result = await service.get_detail(1, mock_user)
             assert result.knowledge_path == []
         finally:
             for p in ps:
@@ -493,6 +525,8 @@ class TestKnowledgeDetailService:
     async def test_dir_not_found_empty_path(self):
         item = make_mock_item(cate_id=999)
         kb = make_mock_kb()
+        from app.entities.user import User
+        mock_user = User(id=1, username="testuser")
 
         ps = self._patch_models(item, kb, dir_node=None)
         for p in ps:
@@ -501,7 +535,7 @@ class TestKnowledgeDetailService:
             from app.services.knowledge_item import KnowledgeItemService
 
             service = KnowledgeItemService(MagicMock())
-            result = await service.get_detail(1)
+            result = await service.get_detail(1, mock_user)
             assert result.knowledge_path == []
         finally:
             for p in ps:
@@ -512,6 +546,8 @@ class TestKnowledgeDetailService:
     @pytest.mark.asyncio
     async def test_kb_not_found_empty_name(self):
         item = make_mock_item()
+        from app.entities.user import User
+        mock_user = User(id=1, username="testuser")
 
         ps = self._patch_models(item, kb=None)
         for p in ps:
@@ -520,7 +556,7 @@ class TestKnowledgeDetailService:
             from app.services.knowledge_item import KnowledgeItemService
 
             service = KnowledgeItemService(MagicMock())
-            result = await service.get_detail(1)
+            result = await service.get_detail(1, mock_user)
             assert result.kb_name == ""
         finally:
             for p in ps:
@@ -529,6 +565,8 @@ class TestKnowledgeDetailService:
     @pytest.mark.asyncio
     async def test_kb_id_zero_empty_name(self):
         item = make_mock_item(kb_id=0)
+        from app.entities.user import User
+        mock_user = User(id=1, username="testuser")
 
         ps = self._patch_models(item)
         for p in ps:
@@ -537,7 +575,7 @@ class TestKnowledgeDetailService:
             from app.services.knowledge_item import KnowledgeItemService
 
             service = KnowledgeItemService(MagicMock())
-            result = await service.get_detail(1)
+            result = await service.get_detail(1, mock_user)
             assert result.kb_name == ""
         finally:
             for p in ps:
@@ -549,6 +587,8 @@ class TestKnowledgeDetailService:
     async def test_richtext_knowledge_type(self):
         item = make_mock_item(knowledge_type=0, content='[{"type":"p","children":[{"text":"h"}]}]')
         kb = make_mock_kb()
+        from app.entities.user import User
+        mock_user = User(id=1, username="testuser")
 
         ps = self._patch_models(item, kb)
         for p in ps:
@@ -557,7 +597,7 @@ class TestKnowledgeDetailService:
             from app.services.knowledge_item import KnowledgeItemService
 
             service = KnowledgeItemService(MagicMock())
-            result = await service.get_detail(1)
+            result = await service.get_detail(1, mock_user)
             assert result.knowledge_type == 0
             assert result.content is not None
         finally:
@@ -568,6 +608,8 @@ class TestKnowledgeDetailService:
     async def test_file_knowledge_type(self):
         item = make_mock_item(knowledge_type=2, dir_type=2, content=None)
         kb = make_mock_kb()
+        from app.entities.user import User
+        mock_user = User(id=1, username="testuser")
 
         ps = self._patch_models(item, kb)
         for p in ps:
@@ -576,7 +618,7 @@ class TestKnowledgeDetailService:
             from app.services.knowledge_item import KnowledgeItemService
 
             service = KnowledgeItemService(MagicMock())
-            result = await service.get_detail(1)
+            result = await service.get_detail(1, mock_user)
             assert result.knowledge_type == 2
             assert result.dir_type == 2
         finally:
@@ -589,15 +631,17 @@ class TestKnowledgeDetailService:
     async def test_has_all_detail_fields(self):
         item = make_mock_item()
         kb = make_mock_kb()
+        from app.entities.user import User
+        mock_user = User(id=1, username="testuser")
 
-        ps = self._patch_models(item, kb)
+        ps = self._patch_models(item, kb, user_mock=_make_user_model_mock("admin"))
         for p in ps:
             p.start()
         try:
             from app.services.knowledge_item import KnowledgeItemService
 
             service = KnowledgeItemService(MagicMock())
-            result = await service.get_detail(1)
+            result = await service.get_detail(1, mock_user)
 
             for field in [
                 "kb_name", "knowledge_path", "creator_user_info",
@@ -615,6 +659,8 @@ class TestKnowledgeDetailService:
         """item_data 在 increment_view_count 之前提取，返回调用前快照值"""
         item = make_mock_item(view_count=42)
         kb = make_mock_kb()
+        from app.entities.user import User
+        mock_user = User(id=1, username="testuser")
 
         ps = self._patch_models(item, kb)
         for p in ps:
@@ -623,7 +669,7 @@ class TestKnowledgeDetailService:
             from app.services.knowledge_item import KnowledgeItemService
 
             service = KnowledgeItemService(MagicMock())
-            result = await service.get_detail(1)
+            result = await service.get_detail(1, mock_user)
             assert result.view_count == 42
         finally:
             for p in ps:
@@ -645,6 +691,14 @@ def _make_item_model_mock(item):
 def _make_kb_model_mock(kb):
     m = MagicMock()
     m.get_by_id = AsyncMock(return_value=kb)
+    return m
+
+
+def _make_user_model_mock(username="admin"):
+    m = MagicMock()
+    user = MagicMock()
+    user.username = username
+    m.get_by_username = AsyncMock(return_value=user)
     return m
 
 

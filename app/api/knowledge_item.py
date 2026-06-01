@@ -22,7 +22,7 @@ async def get_knowledge_detail(
     current_user: Annotated[User, Depends(get_current_user)],
     service: Annotated[KnowledgeItemService, Depends(get_knowledge_item_service)],
 ) -> KnowledgeItemDetailOut:
-    return await service.get_detail(knowledge_id)
+    return await service.get_detail(knowledge_id, current_user)
 
 
 @router.post("/item", response_model=KnowledgeItemOut, status_code=201)

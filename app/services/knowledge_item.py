@@ -1,8 +1,10 @@
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.entities.user import User
 from app.models.knowledge_base import KnowledgeBaseModel
 from app.models.knowledge_item import KnowledgeItemModel
+from app.models.user import UserModel
 from app.schemas.knowledge_item import (
     KnowledgeItemCreate,
     KnowledgeItemDetailOut,
@@ -126,7 +128,7 @@ class KnowledgeItemService:
             items=[KnowledgeItemOut.model_validate(item) for item in items],
         )
 
-    async def get_detail(self, knowledge_id: int) -> KnowledgeItemDetailOut:
+    async def get_detail(self, knowledge_id: int, current_user: User) -> KnowledgeItemDetailOut:
         item = await KnowledgeItemModel.get_by_id(self.db, knowledge_id)
         if item is None:
             raise HTTPException(
@@ -160,8 +162,31 @@ class KnowledgeItemService:
         # 递增浏览数
         await KnowledgeItemModel.increment_view_count(self.db, knowledge_id)
 
+        creator_user_info = None
+        if item.creator:
+            creator_user = await UserModel.get_by_username(self.db, item.creator)
+            if creator_user:
+                creator_user_info = {"username": creator_user.username}
+
+        last_modify_user_info = None
+        if item.last_modify_user:
+            modifier = await UserModel.get_by_username(self.db, item.last_modify_user)
+            if modifier:
+                last_modify_user_info = {"username": modifier.username}
+
+        tag_names = item.tag_ids.split(",") if item.tag_ids else []
+
+        is_edit = (item.creator == current_user.username)
+
+        is_download = True
+
         return KnowledgeItemDetailOut(
             **item_data,
             kb_name=kb_name,
             knowledge_path=knowledge_path,
+            creator_user_info=creator_user_info,
+            last_modify_user_info=last_modify_user_info,
+            tag_names=tag_names,
+            is_edit=is_edit,
+            is_download=is_download,
         )
