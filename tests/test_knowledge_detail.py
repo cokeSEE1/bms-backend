@@ -404,6 +404,27 @@ class TestKnowledgeDetailService:
                 p.stop()
 
     @pytest.mark.asyncio
+    async def test_is_edit_true_when_creator_equals_current_user(self):
+        item = make_mock_item(creator="testuser")
+        kb = make_mock_kb()
+        from app.entities.user import User
+        mock_user = User(id=1, username="testuser")
+
+        ps = self._patch_models(item, kb, user_mock=_make_user_model_mock("testuser"))
+        for p in ps:
+            p.start()
+        try:
+            from app.services.knowledge_item import KnowledgeItemService
+
+            service = KnowledgeItemService(MagicMock())
+            result = await service.get_detail(1, mock_user)
+
+            assert result.is_edit is True
+        finally:
+            for p in ps:
+                p.stop()
+
+    @pytest.mark.asyncio
     async def test_calls_increment_view_count(self):
         item = make_mock_item(view_count=5)
         kb = make_mock_kb()
