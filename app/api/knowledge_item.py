@@ -5,11 +5,13 @@ from fastapi import APIRouter, Depends, Query, status
 from app.api.deps import get_current_user, get_knowledge_item_service
 from app.entities.user import User
 from app.schemas.knowledge_item import (
+    FavoriteActionRequest,
     KnowledgeItemCreate,
     KnowledgeItemDetailOut,
     KnowledgeItemListResponse,
     KnowledgeItemOut,
     KnowledgeItemUpdate,
+    ToggleActionRequest,
 )
 from app.services.knowledge_item import KnowledgeItemService
 
@@ -98,3 +100,56 @@ async def list_knowledge_items(
         limit=page_size,
         offset=offset,
     )
+
+
+@router.get("/search", response_model=KnowledgeItemListResponse)
+async def search_knowledge_items(
+    keyword: Annotated[str, Query(min_length=1, description="搜索关键词")],
+    current_user: Annotated[User, Depends(get_current_user)],
+    service: Annotated[KnowledgeItemService, Depends(get_knowledge_item_service)],
+    cate_id: Annotated[int | None, Query(description="目录id")] = None,
+    status: Annotated[int | None, Query(ge=1, le=4)] = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> KnowledgeItemListResponse:
+    offset = (page - 1) * page_size
+    total, items = await service.search_items(
+        keyword=keyword,
+        cate_id=cate_id,
+        status=status,
+        limit=page_size,
+        offset=offset,
+    )
+    return KnowledgeItemListResponse(
+        total=total,
+        items=[KnowledgeItemOut.model_validate(item) for item in items],
+    )
+
+
+@router.post("/item/{item_id}/like", response_model=KnowledgeItemOut)
+async def toggle_knowledge_like(
+    item_id: int,
+    body: ToggleActionRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    service: Annotated[KnowledgeItemService, Depends(get_knowledge_item_service)],
+) -> KnowledgeItemOut:
+    return await service.toggle_like(item_id, body.action)
+
+
+@router.post("/item/{item_id}/favorite", response_model=KnowledgeItemOut)
+async def toggle_knowledge_favorite(
+    item_id: int,
+    body: FavoriteActionRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    service: Annotated[KnowledgeItemService, Depends(get_knowledge_item_service)],
+) -> KnowledgeItemOut:
+    return await service.toggle_favorite(item_id, body.action)
+
+
+@router.post("/item/{item_id}/share", response_model=KnowledgeItemOut)
+async def share_knowledge_item(
+    item_id: int,
+    current_user: Annotated[User, Depends(get_current_user)],
+    service: Annotated[KnowledgeItemService, Depends(get_knowledge_item_service)],
+) -> KnowledgeItemOut:
+    return await service.share_item(item_id)

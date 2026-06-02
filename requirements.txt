@@ -7,3 +7,5 @@ bcrypt>=4.2
 python-jose[cryptography]>=3.3
 pypinyin>=0.51.0
 redis[hiredis]>=5.0
+python-multipart>=0.0.20
+minio>=7.2

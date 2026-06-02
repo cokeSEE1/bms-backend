@@ -9,6 +9,7 @@ from app.core.redis import get_redis
 from app.core.security import create_access_token, hash_password, verify_password
 from app.entities.user import User
 from app.schemas.auth import LogoutOut, TokenOut
+from app.schemas.change_password import ChangePasswordOut, ChangePasswordRequest
 from app.schemas.user import UserLogin, UserOut, UserRegister
 
 
@@ -54,3 +55,13 @@ class AuthService:
                 except RedisError:
                     pass  # Redis 不可达时降级，不影响退出响应
         return LogoutOut(message="已退出登录")
+
+    async def change_password(self, user: User, body: ChangePasswordRequest) -> ChangePasswordOut:
+        if not verify_password(body.old_password, user.password):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="旧密码错误",
+            )
+        user.password = hash_password(body.new_password)
+        await self.db.commit()
+        return ChangePasswordOut(message="密码修改成功")

@@ -151,3 +151,116 @@ class KnowledgeItemModel:
             .values(view_count=KnowledgeItem.view_count + 1),
         )
         await db.commit()
+
+    @staticmethod
+    async def increment_like_count(db: AsyncSession, item_id: int) -> None:
+        await db.execute(
+            update(KnowledgeItem)
+            .where(KnowledgeItem.id == item_id, KnowledgeItem.is_delete == 0)
+            .values(like_count=KnowledgeItem.like_count + 1),
+        )
+        await db.commit()
+
+    @staticmethod
+    async def decrement_like_count(db: AsyncSession, item_id: int) -> None:
+        await db.execute(
+            update(KnowledgeItem)
+            .where(KnowledgeItem.id == item_id, KnowledgeItem.is_delete == 0)
+            .values(like_count=KnowledgeItem.like_count - 1),
+        )
+        await db.commit()
+
+    @staticmethod
+    async def increment_favorite_count(db: AsyncSession, item_id: int) -> None:
+        await db.execute(
+            update(KnowledgeItem)
+            .where(KnowledgeItem.id == item_id, KnowledgeItem.is_delete == 0)
+            .values(favorite_count=KnowledgeItem.favorite_count + 1),
+        )
+        await db.commit()
+
+    @staticmethod
+    async def decrement_favorite_count(db: AsyncSession, item_id: int) -> None:
+        await db.execute(
+            update(KnowledgeItem)
+            .where(KnowledgeItem.id == item_id, KnowledgeItem.is_delete == 0)
+            .values(favorite_count=KnowledgeItem.favorite_count - 1),
+        )
+        await db.commit()
+
+    @staticmethod
+    async def count_items_by_creator(db: AsyncSession, creator: str) -> int:
+        """统计某用户创建的知识条目数"""
+        from app.entities.knowledge_item import KnowledgeItem
+
+        stmt = select(func.count()).select_from(KnowledgeItem).where(
+            KnowledgeItem.creator == creator,
+            KnowledgeItem.is_delete == 0,
+        )
+        result = await db.execute(stmt)
+        return result.scalar() or 0
+
+    @staticmethod
+    async def sum_view_count_by_creator(db: AsyncSession, creator: str) -> int:
+        """统计某用户创建的知识条目总阅读量"""
+        from app.entities.knowledge_item import KnowledgeItem
+
+        stmt = (
+            select(func.coalesce(func.sum(KnowledgeItem.view_count), 0))
+            .select_from(KnowledgeItem)
+            .where(
+                KnowledgeItem.creator == creator,
+                KnowledgeItem.is_delete == 0,
+            )
+        )
+        result = await db.execute(stmt)
+        return result.scalar() or 0
+
+    @staticmethod
+    async def list_participated(
+        db: AsyncSession, creator: str, limit: int = 10,
+    ) -> list[KnowledgeItem]:
+        """获取用户参与的知识列表（按更新时间倒序）"""
+        from app.entities.knowledge_item import KnowledgeItem
+
+        stmt = (
+            select(KnowledgeItem)
+            .where(KnowledgeItem.creator == creator, KnowledgeItem.is_delete == 0)
+            .order_by(KnowledgeItem.update_time.desc())
+            .limit(limit)
+        )
+        result = await db.execute(stmt)
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def get_top_by_field(
+        db: AsyncSession,
+        field: str,  # 'view_count' | 'like_count' | 'favorite_count'
+        limit: int = 10,
+    ) -> list:
+        """获取指定字段排名前N的知识条目"""
+        from sqlalchemy import desc, select
+        from app.entities.knowledge_item import KnowledgeItem
+
+        allowed = {'view_count', 'like_count', 'favorite_count'}
+        if field not in allowed:
+            raise ValueError(f"Invalid ranking field: {field}")
+
+        col = getattr(KnowledgeItem, field)
+        stmt = (
+            select(KnowledgeItem)
+            .where(KnowledgeItem.is_delete == 0, KnowledgeItem.status == 3)
+            .order_by(desc(col))
+            .limit(limit)
+        )
+        result = await db.execute(stmt)
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def increment_share_num(db: AsyncSession, item_id: int) -> None:
+        await db.execute(
+            update(KnowledgeItem)
+            .where(KnowledgeItem.id == item_id, KnowledgeItem.is_delete == 0)
+            .values(share_num=KnowledgeItem.share_num + 1),
+        )
+        await db.commit()

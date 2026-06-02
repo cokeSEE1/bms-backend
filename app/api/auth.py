@@ -7,6 +7,7 @@ from app.api.deps import get_auth_service, get_current_user
 from app.config import ALGORITHM, SECRET_KEY
 from app.models.user import User
 from app.schemas.auth import LogoutOut, TokenOut
+from app.schemas.change_password import ChangePasswordOut, ChangePasswordRequest
 from app.schemas.user import UserLogin, UserOut, UserRegister
 from app.services.auth import AuthService
 
@@ -45,3 +46,12 @@ async def logout(
     _, _, token = authorization.partition(" ")
     payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     return await service.logout(payload["jti"], payload["exp"])
+
+
+@router.put("/change-password", response_model=ChangePasswordOut)
+async def change_password(
+    body: ChangePasswordRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    service: Annotated[AuthService, Depends(get_auth_service)],
+) -> ChangePasswordOut:
+    return await service.change_password(current_user, body)

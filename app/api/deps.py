@@ -12,8 +12,10 @@ from app.core.database import AsyncSessionLocal
 from app.core.redis import get_redis
 from app.entities.user import User
 from app.services.auth import AuthService
+from app.services.comment import CommentService
 from app.services.knowledge_directory import KnowledgeDirectoryService
 from app.services.knowledge_item import KnowledgeItemService
+from app.services.user_stats import UserStatsService
 
 
 async def get_db() -> AsyncGenerator[AsyncSession]:
@@ -90,3 +92,15 @@ def get_knowledge_item_service(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> KnowledgeItemService:
     return KnowledgeItemService(db)
+
+
+def get_comment_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> CommentService:
+    return CommentService(db)
+
+
+def get_user_stats_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> UserStatsService:
+    return UserStatsService(db)

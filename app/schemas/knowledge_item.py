@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -83,7 +84,15 @@ class KnowledgeItemDetailOut(KnowledgeItemOut):
     tag_names: list[str] | None = None
     attachments: list[dict] | None = None
     is_favorite: bool | None = None
-    is_edit: bool | None = None
-    is_download: bool | None = None
+    is_edit: bool = False
+    is_download: bool = False
     comments_count: int | None = None
     related_knowledge: list[dict] | None = None
+
+
+class ToggleActionRequest(BaseModel):
+    action: Literal["like", "unlike"] = Field(..., description="like=点赞, unlike=取消点赞")
+
+
+class FavoriteActionRequest(BaseModel):
+    action: Literal["favorite", "unfavorite"] = Field(..., description="favorite=收藏, unfavorite=取消收藏")

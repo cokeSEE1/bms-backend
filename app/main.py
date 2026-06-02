@@ -11,6 +11,7 @@ from app.config import DATABASE_URL, DB_CHECK_ON_STARTUP
 from app.core.database import Base, engine
 from app.core.elasticsearch import close_es, init_es
 from app.core.es_index import ensure_index
+from app.core.minio import close_minio, init_minio
 from app.core.redis import close_redis, init_redis
 from app.models import base as _models_base  # noqa: F401 — 确保所有 entity 被导入后再 create_all
 
@@ -28,11 +29,13 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
             ) from exc
     await init_redis()
     await init_es()
+    await init_minio()
     await ensure_index()
     yield
     await engine.dispose()
     await close_redis()
     await close_es()
+    await close_minio()
 
 
 def create_app() -> FastAPI:

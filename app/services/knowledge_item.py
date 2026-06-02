@@ -128,6 +128,75 @@ class KnowledgeItemService:
             items=[KnowledgeItemOut.model_validate(item) for item in items],
         )
 
+    async def toggle_like(self, item_id: int, action: str) -> KnowledgeItemOut:
+        item = await KnowledgeItemModel.get_by_id(self.db, item_id)
+        if item is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="知识条目不存在")
+        if action == "like":
+            await KnowledgeItemModel.increment_like_count(self.db, item_id)
+        else:
+            await KnowledgeItemModel.decrement_like_count(self.db, item_id)
+        return KnowledgeItemOut.model_validate(await KnowledgeItemModel.get_by_id(self.db, item_id))
+
+    async def toggle_favorite(self, item_id: int, action: str) -> KnowledgeItemOut:
+        item = await KnowledgeItemModel.get_by_id(self.db, item_id)
+        if item is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="知识条目不存在")
+        if action == "favorite":
+            await KnowledgeItemModel.increment_favorite_count(self.db, item_id)
+        else:
+            await KnowledgeItemModel.decrement_favorite_count(self.db, item_id)
+        return KnowledgeItemOut.model_validate(await KnowledgeItemModel.get_by_id(self.db, item_id))
+
+    async def share_item(self, item_id: int) -> KnowledgeItemOut:
+        item = await KnowledgeItemModel.get_by_id(self.db, item_id)
+        if item is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="知识条目不存在")
+        await KnowledgeItemModel.increment_share_num(self.db, item_id)
+        return KnowledgeItemOut.model_validate(await KnowledgeItemModel.get_by_id(self.db, item_id))
+
+    async def search_items(
+        self,
+        keyword: str,
+        cate_id: int | None = None,
+        status: int | None = None,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> tuple[int, list]:
+        """搜索知识条目（优先 ES，降级 MySQL LIKE）"""
+        from app.services.es_search import search_knowledge_items
+
+        result = await search_knowledge_items(
+            keyword=keyword,
+            cate_id=cate_id,
+            status=status,
+            limit=limit,
+            offset=offset,
+        )
+
+        if result is not None:
+            total, ids = result
+            if not ids:
+                return 0, []
+            items = []
+            for item_id in ids:
+                try:
+                    item = await self.get_item(item_id)
+                    items.append(item)
+                except Exception:
+                    pass
+            return total, items
+
+        # ES 不可达，降级 MySQL LIKE
+        response = await self.list_items(
+            search=keyword,
+            cate_id=cate_id,
+            status=status,
+            limit=limit,
+            offset=offset,
+        )
+        return response.total, response.items
+
     async def get_detail(self, knowledge_id: int, current_user: User) -> KnowledgeItemDetailOut:
         item = await KnowledgeItemModel.get_by_id(self.db, knowledge_id)
         if item is None:
